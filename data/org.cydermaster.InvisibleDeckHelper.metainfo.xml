@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.cydermaster.InvisibleDeckHelper</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Invisible Deck Helper</name>
+  <summary>Practice aid for the Invisible Deck card trick</summary>
+
+  <developer id="org.cydermaster">
+    <name>Cydermaster</name>
+  </developer>
+
+  <description>
+    <p>Invisible Deck Helper deals you one card at a time so you can rehearse the
+    Invisible Deck. A spectator names a card, you spread the deck and the named
+    card is the only one face up — this shows you the card, and optionally the
+    card glued to its back, so you can check yourself.</p>
+    <ul>
+      <li>Shows a single random card by default</li>
+      <li>An "Invisible Deck pair" toggle, off by default, reveals the partner card</li>
+      <li>Space or Enter deals the next card</li>
+    </ul>
+    <p>The pairings follow the published arrangement: hearts pair with spades and
+    diamonds with clubs, each pair totals thirteen, and kings pair with kings.</p>
+  </description>
+
+  <launchable type="desktop-id">org.cydermaster.InvisibleDeckHelper.desktop</launchable>
+
+  <categories>
+    <category>Game</category>
+    <category>CardGame</category>
+  </categories>
+
+  <keywords>
+    <keyword>cards</keyword>
+    <keyword>magic</keyword>
+    <keyword>invisible deck</keyword>
+    <keyword>practice</keyword>
+  </keywords>
+
+  <content_rating type="oars-1.1"/>
+
+  <releases>
+    <release version="1.0.0" date="2026-10-25">
+      <description>
+        <p>First release: one card at a time with an optional Invisible Deck pair reveal.</p>
+      </description>
+    </release>
+  </releases>
+</component>

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Invisible Deck Helper
+Comment=Practice aid for the Invisible Deck card trick
+Exec=invisible-deck-helper
+Icon=org.cydermaster.InvisibleDeckHelper
+Terminal=false
+Type=Application
+Categories=Game;CardGame;
+Keywords=cards;magic;invisible deck;practice;card trick;
+StartupWMClass=invisible-deck-helper

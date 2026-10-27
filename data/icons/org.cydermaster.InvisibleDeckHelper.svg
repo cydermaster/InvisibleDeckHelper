@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="felt" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#17513f"/>
+      <stop offset="1" stop-color="#0b2f26"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="24" fill="url(#felt)"/>
+
+  <!-- face-down card, slightly behind -->
+  <rect x="26" y="26" width="50" height="72" rx="7" fill="#1d6b52" stroke="#0a2a22" stroke-width="2"/>
+
+  <!-- face-up card in front -->
+  <rect x="46" y="32" width="52" height="72" rx="7" fill="#fbfbf4" stroke="#c3c3b6" stroke-width="2"/>
+
+  <!-- heart pip -->
+  <path d="M72 62c-6-8-16-5-16 4 0 8 11 14 16 20 5-6 16-12 16-20 0-9-10-12-16-4z"
+        fill="#c0392b"/>
+
+  <!-- corner rank -->
+  <text x="54" y="50" font-family="sans-serif" font-size="15" font-weight="bold" fill="#1b1b1b">A</text>
+</svg>

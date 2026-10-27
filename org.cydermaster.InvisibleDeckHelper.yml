@@ -1,0 +1,51 @@
+app-id: org.cydermaster.InvisibleDeckHelper
+runtime: org.freedesktop.Platform
+runtime-version: '26.08'
+sdk: org.freedesktop.Sdk
+# Rust toolchain ships as an SDK extension, so no compiler has to be vendored.
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: invisible-deck-helper
+
+finish-args:
+  # Wayland first with an X11 fallback: Kubuntu 26.04 is Plasma 6/Wayland.
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+  env:
+    CARGO_HOME: /run/build/invisible-deck-helper/cargo
+
+modules:
+  - name: invisible-deck-helper
+    buildsystem: simple
+    build-commands:
+      # --offline: every crate comes from cargo-sources.json, nothing is fetched.
+      - cargo --offline fetch --manifest-path Cargo.toml --verbose
+      - cargo --offline build --release --locked
+      - install -Dm755 target/release/invisible-deck-helper /app/bin/invisible-deck-helper
+      - install -Dm644 data/org.cydermaster.InvisibleDeckHelper.desktop
+        /app/share/applications/org.cydermaster.InvisibleDeckHelper.desktop
+      - install -Dm644 data/org.cydermaster.InvisibleDeckHelper.metainfo.xml
+        /app/share/metainfo/org.cydermaster.InvisibleDeckHelper.metainfo.xml
+      - install -Dm644 data/icons/org.cydermaster.InvisibleDeckHelper.svg
+        /app/share/icons/hicolor/scalable/apps/org.cydermaster.InvisibleDeckHelper.svg
+    sources:
+      - type: dir
+        path: .
+        skip:
+          - build-dir
+          - target
+          - bin
+          - .flatpak-builder
+          - .venv-gen
+          - .flatpak-cargo-generator.py
+          - repo
+          - '*.flatpak'
+          - screenshot.png
+          - 'screenshot-*.png'
+          - vendor
+      - cargo-sources.json
