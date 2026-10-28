@@ -1,0 +1,53 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # The pairing engine is the heart of the app: if a refactor breaks it on
+      # either platform, this is where it shows.
+      - name: cargo test
+        run: cargo test --locked
+
+      - name: cargo build
+        run: cargo build --release --locked
+
+  package-windows:
+    name: portable Windows ZIP
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Only needed to drive pip; the wheels are fetched for the embedded 3.11.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Runs the same script a user would run on their own machine, so the
+      # packaging path is exercised on every push rather than only at release.
+      - name: Build portable ZIP
+        shell: pwsh
+        run: ./windows/build-portable-zip.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-portable-zip
+          path: dist/*.zip
+          if-no-files-found: error

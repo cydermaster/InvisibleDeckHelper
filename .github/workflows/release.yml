@@ -1,0 +1,85 @@
+name: release
+
+# Tag a commit (e.g. git tag v1.2.0 && git push origin v1.2.0) and this builds
+# both packages and attaches them to the GitHub release.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux-flatpak:
+    name: Linux Flatpak
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: cargo test
+        run: cargo test --locked
+
+      - name: Install flatpak-builder and the runtimes the manifest names
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub \
+            https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub \
+            org.freedesktop.Platform//26.08 \
+            org.freedesktop.Sdk//26.08 \
+            org.freedesktop.Sdk.Extension.rust-stable//26.08
+
+      - name: Build the bundle
+        run: ./build-flatpak.sh --bundle
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flatpak
+          path: '*.flatpak'
+          if-no-files-found: error
+
+  windows-zip:
+    name: Windows portable ZIP
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build portable ZIP
+        shell: pwsh
+        run: ./windows/build-portable-zip.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-zip
+          path: dist/*.zip
+          if-no-files-found: error
+
+  publish:
+    name: Attach to release
+    needs: [linux-flatpak, windows-zip]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List what will be published
+        run: ls -lh artifacts
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**
+          generate_release_notes: true
+          fail_on_unmatched_files: true

@@ -48,6 +48,15 @@
   <url type="bugtracker">https://github.com/cydermaster/InvisibleDeckHelper/issues</url>
 
   <releases>
+    <release version="1.2.0" date="2026-10-28">
+      <description>
+        <p>Runs on Windows 11 as well as Linux. Speech keeps using Piper with the
+        English (Great Britain) Alan medium voice: on Windows the app ships an
+        embedded Python beside the exe, and plays audio through winmm instead of
+        PulseAudio. Adds a --speech-info report that lists every path searched
+        when speech cannot be found.</p>
+      </description>
+    </release>
     <release version="1.1.1" date="2026-10-28">
       <description>
         <p>Adds a "Mute speech" tickbox to silence the voice for a session without
