@@ -65,7 +65,12 @@ NUMPY_PIN="${NUMPY_PIN:-}"
 "$PIP" install --quiet --no-index --find-links="$WORK/wheels" \
     --target="$WORK/pyembed/Lib/site-packages" \
     --platform win_amd64 --python-version "$PY_TAG" --implementation cp --abi "cp${PY_TAG}" \
-    --only-binary=:all: piper-tts==1.8.0 $NUMPY_PIN
+    --only-binary=:all: piper-tts==1.8.0 $NUMPY_PIN \
+    --no-compile
+# --no-compile stops pip writing .pyc for *its own* interpreter (e.g. cp313 on a
+# CI runner). Those files are useless to the embedded 3.11 and only bloat the
+# bundle, so purge any that slipped in from an earlier run.
+find "$WORK/pyembed/Lib/site-packages" -type d -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null || true
 rm -rf "$WORK/pyembed/Lib/site-packages/__pycache__" \
        "$WORK/pyembed/Lib/site-packages/bin"
 
@@ -77,6 +82,8 @@ cp -a "$WORK/pyembed/." "$OUT/python/"
 # ---- 4. voice + docs --------------------------------------------------------
 install -Dm644 "$HOME/piper-test/${VOICE}.onnx"      "$OUT/voices/${VOICE}.onnx"
 install -Dm644 "$HOME/piper-test/${VOICE}.onnx.json" "$OUT/voices/${VOICE}.onnx.json"
+# Licence texts travel with the binaries that need them.
+install -Dm644 LICENSE NOTICE "$OUT/"
 # The shipped README carries the version, so stamp it rather than editing by hand.
 sed "s/__VERSION__/${VERSION}/g" windows/README-portable.txt > "$OUT/README.txt"
 

@@ -61,4 +61,4 @@ Speech synthesis takes a second or two per phrase, because the voice model
 is loaded fresh each time.
 
 Version __VERSION__ - https://github.com/cydermaster/InvisibleDeckHelper
-MIT licensed.
+See LICENSE for the project licence and NOTICE for the bundled components.

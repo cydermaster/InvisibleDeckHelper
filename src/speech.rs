@@ -239,6 +239,15 @@ impl Speaker {
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
             .stderr(Stdio::piped());
+        // Do not let the child interpreter write .pyc files next to its own
+        // library: those are not ours to create, they litter the folder for
+        // portable users, they fail outright under Program Files for an
+        // all-users install, and they defeat the uninstaller's tidy-up because
+        // Inno Setup only removes files it installed itself.
+        cmd.env("PYTHONDONTWRITEBYTECODE", "1");
+        // Ignore any host user-site packages, so a copy of piper the user has
+        // installed for themselves can never shadow the bundled one.
+        cmd.env("PYTHONNOUSERSITE", "1");
         // Keep the console window from flashing up when the GUI app shells out.
         #[cfg(windows)]
         {

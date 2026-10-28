@@ -1,0 +1,43 @@
+Invisible Deck Helper — third-party components
+==============================================
+
+This package bundles software written by others. Their licences are below. The
+project's own licence is whatever the LICENSE file in this folder says; where
+Cargo.toml and LICENSE disagree, the LICENSE file governs and the discrepancy
+should be resolved rather than guessed at.
+
+Included components
+
+  Piper TTS (piper1-gpl)            GPL-3.0-or-later
+    Speech synthesis engine, invoked as a bundled program.
+    https://github.com/OHF-Voice/piper1-gpl
+
+  espeak-ng data (shipped by piper) GPL-3.0-or-later
+    Phoneme data used by piper.
+    https://github.com/espeak-ng/espeak-ng
+
+  CPython 3.11 (embeddable)         PSF-2.0
+    The interpreter in the python\ folder.
+    https://www.python.org/
+
+  onnxruntime                       MIT
+    Neural network runtime used by piper.
+    https://github.com/microsoft/onnxruntime
+
+  numpy                             BSD-3-Clause
+    https://numpy.org/
+
+  en_GB-alan-medium voice model     CC BY 4.0
+    Voice model by the Rhasspy Piper voices project.
+    https://huggingface.co/rhasspy/piper-voices
+
+Notes
+
+  * Piper and espeak-ng are GPL-3.0-or-later. They are distributed here as
+    separate programs inside the bundle, with their own licences, not merged
+    into the application's source. Their complete corresponding source is
+    available at the URLs above.
+  * The voice model is a creative work under CC BY 4.0 and is not covered by
+    either the application's licence or Piper's.
+  * Fonts and icon assets come from the egui/eframe crates listed in
+    Cargo.lock, each under its own licence.

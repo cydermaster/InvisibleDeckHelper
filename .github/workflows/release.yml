@@ -34,7 +34,7 @@ jobs:
             org.freedesktop.Sdk.Extension.rust-stable//26.08
 
       - name: Build the bundle
-        run: bash ./build-flatpak.sh --bundle
+        run: ./build-flatpak.sh --bundle
 
       - uses: actions/upload-artifact@v4
         with:
@@ -58,10 +58,19 @@ jobs:
         shell: pwsh
         run: ./windows/build-portable-zip.ps1
 
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer
+        shell: pwsh
+        run: ./windows/build-installer.ps1
+
       - uses: actions/upload-artifact@v4
         with:
           name: windows-zip
-          path: dist/*.zip
+          path: |
+            dist/*.zip
+            dist/*-setup.exe
           if-no-files-found: error
 
   publish:

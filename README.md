@@ -138,6 +138,27 @@ Build it either way:
 ./windows/build-portable-zip.sh
 ```
 
+### Installer
+
+For people who would rather have it in the Start Menu, `windows/installer.iss`
+builds an Inno Setup installer from the same bundle — identical files, packaged
+with an uninstaller:
+
+```powershell
+winget install --id JRSoftware.InnoSetup --exact   # once
+.\windows\build-portable-zip.ps1                    # produces the bundle
+.\windows\build-installer.ps1                       # wraps the bundle in a setup.exe
+```
+
+It installs **per-user** by default (`%LOCALAPPDATA%\Programs\Invisible Deck Helper`)
+so there is no UAC prompt, and offers an all-users install if launched with
+`/ALLUSERS`. It adds a Start Menu entry, an optional desktop shortcut, and
+registers in Add or Remove Programs. Because the payload is ~240 MB compressed
+with LZMA2, the setup file ends up roughly the size of the ZIP.
+
+The installer is unsigned for now, so SmartScreen will warn on first run — see
+the note below.
+
 The voice model is fetched from Hugging Face and checked against a pinned
 SHA-256 rather than committed — 63 MB of binary does not belong in git. Both
 scripts accept `NUMPY_PIN='numpy==1.26.4'` as an escape hatch if a future numpy
