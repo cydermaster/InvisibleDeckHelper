@@ -1,6 +1,6 @@
 [package]
 name = "invisible-deck-helper"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 description = "Practice aid for the Invisible Deck card trick"
 license = "MIT"

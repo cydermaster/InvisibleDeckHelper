@@ -2,19 +2,20 @@
 # Build Invisible Deck Helper as a .flatpak bundle.
 #
 # Run on the machine that will install it (Kubuntu 26.04) or any Linux box with
-# room for the runtimes (~1.9 GB installed: org.freedesktop.Platform ~800 MB,
-# org.freedesktop.Sdk ~1.1 GB, plus the rust-stable SDK extension).
+# room for the runtimes (~2.5 GB installed: org.gnome.Platform 51, org.gnome.Sdk
+# 51, and the freedesktop rust-stable SDK extension).
 #
 #     ./build-flatpak.sh            # build, install locally, emit the bundle
 #     ./build-flatpak.sh --bundle   # build + emit bundle, no local install
 #
-# Needs: flatpak, flatpak-builder, python3, and network access on this first run
-# (to vendor the Rust crates into cargo-sources.json).
+# Needs: flatpak, flatpak-builder, python3, and network access (the manifest
+# fetches the Piper wheels, onnxruntime, numpy and the voice model by URL+hash).
 set -euo pipefail
 
 APP_ID="org.cydermaster.InvisibleDeckHelper"
 BRANCH="master"
-RUNTIME_VERSION="26.08"
+RUNTIME_VERSION="51"                 # org.gnome.Platform branch
+FD_SDK_EXT_BRANCH="26.08"            # branch of org.freedesktop.Sdk.Extension.*
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$HERE"
 
@@ -37,10 +38,10 @@ if [[ ! -s cargo-sources.json ]]; then
         curl -fsSL -o .flatpak-cargo-generator.py \
             https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/master/cargo/flatpak-cargo-generator.py
     fi
-    # The generator needs aiohttp + toml; keep that in a throwaway venv.
+    # The generator needs aiohttp + tomlkit; keep that in a throwaway venv.
     if [[ ! -d .venv-gen ]]; then
         python3 -m venv .venv-gen
-        ./.venv-gen/bin/pip install -q --disable-pip-version-check aiohttp toml
+        ./.venv-gen/bin/pip install -q --disable-pip-version-check aiohttp tomlkit
     fi
     ./.venv-gen/bin/python .flatpak-cargo-generator.py Cargo.lock -o cargo-sources.json
     echo "   wrote cargo-sources.json ($(grep -c '"type"' cargo-sources.json) entries)"
@@ -53,8 +54,8 @@ if ! flatpak remote-list --user | grep -q '^flathub'; then
 fi
 
 MISSING=()
-for ref in "org.freedesktop.Platform//${RUNTIME_VERSION}" "org.freedesktop.Sdk//${RUNTIME_VERSION}" \
-           "org.freedesktop.Sdk.Extension.rust-stable//${RUNTIME_VERSION}"; do
+for ref in "org.gnome.Platform//${RUNTIME_VERSION}" "org.gnome.Sdk//${RUNTIME_VERSION}" \
+           "org.freedesktop.Sdk.Extension.rust-stable//${FD_SDK_EXT_BRANCH}"; do
     # Match the branch exactly: an older branch being present must not satisfy this.
     flatpak info --user "$ref" >/dev/null 2>&1 || MISSING+=("$ref")
 done
@@ -64,12 +65,14 @@ if [[ ${#MISSING[@]} -gt 0 ]]; then
 fi
 
 # ---- 3. build ---------------------------------------------------------------
-echo ">> building ${APP_ID} v${RUNTIME_VERSION}"
-if [[ $BUNDLE_ONLY -eq 1 ]]; then
-    flatpak-builder --user --force-clean --repo=repo build-dir "${APP_ID}.yml"
-else
-    flatpak-builder --user --install --force-clean --repo=repo build-dir "${APP_ID}.yml"
+# rofiles-fuse needs /dev/fuse; skip it where the device is absent (containers).
+BUILDER_ARGS=(--user --force-clean --repo=repo)
+[[ -e /dev/fuse ]] || BUILDER_ARGS+=(--disable-rofiles-fuse)
+if [[ $BUNDLE_ONLY -eq 0 ]]; then
+    BUILDER_ARGS+=(--install)
 fi
+echo ">> building ${APP_ID} against org.gnome.Platform//${RUNTIME_VERSION}"
+flatpak-builder "${BUILDER_ARGS[@]}" build-dir "${APP_ID}.yml"
 
 # ---- 4. bundle --------------------------------------------------------------
 echo ">> creating bundle"

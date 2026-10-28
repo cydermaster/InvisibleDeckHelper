@@ -17,9 +17,13 @@
     card glued to its back, so you can check yourself.</p>
     <ul>
       <li>Shows a single random card by default</li>
-      <li>An "Invisible Deck pair" toggle, off by default, reveals the partner card</li>
+      <li>Speaks the card aloud with Piper (English, Great Britain — Alan, medium quality)</li>
+      <li>An "Invisible Deck pair" toggle, off by default, reveals and announces the partner card</li>
       <li>Space or Enter deals the next card</li>
     </ul>
+    <p>With the pair toggle off it says just the card ("Queen of Hearts"); with it
+    on it says "Queen of Hearts pairs with Ace of Spades". Speech is generated
+    locally — nothing is sent to any service.</p>
     <p>The pairings follow the published arrangement: hearts pair with spades and
     diamonds with clubs, each pair totals thirteen, and kings pair with kings.</p>
   </description>
@@ -40,7 +44,17 @@
 
   <content_rating type="oars-1.1"/>
 
+  <url type="homepage">https://github.com/cydermaster/InvisibleDeckHelper</url>
+  <url type="bugtracker">https://github.com/cydermaster/InvisibleDeckHelper/issues</url>
+
   <releases>
+    <release version="1.1.0" date="2026-10-28">
+      <description>
+        <p>Adds spoken output using Piper with the English (Great Britain) Alan
+        medium voice: the card alone by default, or "card pairs with card" when
+        the Invisible Deck pair toggle is on.</p>
+      </description>
+    </release>
     <release version="1.0.0" date="2026-10-25">
       <description>
         <p>First release: one card at a time with an optional Invisible Deck pair reveal.</p>

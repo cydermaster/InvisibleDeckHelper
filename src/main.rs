@@ -1,12 +1,12 @@
 //! Invisible Deck Helper — a practice aid for the Invisible Deck card trick.
 //!
-//! Shows one card at a time. The spectator "names a card"; you turn over the
-//! deck, spread it, and the named card is the only face-up one. This helper
-//! deals you a random card to practise against, and an optional toggle reveals
-//! the invisible partner it is glued to — off by default, so you can self-test.
+//! Deals one card at a time and speaks it aloud with Piper (en_GB-alan-medium).
+//! By default it says just the card ("Queen of Hearts"); with the pair toggle on
+//! it says "Queen of Hearts pairs with Ace of Spades".
 
 mod cards;
 mod rng;
+mod speech;
 
 use cards::{all_pairs, full_deck, Card, RANK_SHORT};
 use eframe::egui;
@@ -58,11 +58,23 @@ fn draw_card(ui: &mut egui::Ui, card: Card, size: egui::Vec2) {
     );
 }
 
+/// The sentence spoken for a given card and toggle state.
+fn spoken_phrase(card: Card, show_pair: bool) -> String {
+    if show_pair {
+        format!("{} pairs with {}", card.long(), card.partner().long())
+    } else {
+        card.long()
+    }
+}
+
 struct HelperApp {
     current: Card,
     show_pair: bool,
     random: Random,
     deals: u32,
+    speaker: Option<speech::Speaker>,
+    speech_status: String,
+    last_phrase: String,
 }
 
 impl HelperApp {
@@ -70,13 +82,49 @@ impl HelperApp {
         let mut random = Random::live();
         let deck = full_deck();
         let current = deck[random.below(deck.len())];
-        Self { current, show_pair: false, random, deals: 1 }
+        let (speaker, speech_status) = match speech::Speaker::detect() {
+            Some(s) => {
+                let desc = s.describe();
+                (Some(s), format!("speech: {desc}"))
+            }
+            None => (
+                None,
+                "speech unavailable (piper or voice model not found) — dealing silently".to_string(),
+            ),
+        };
+        let mut app = Self {
+            current,
+            show_pair: false,
+            random,
+            deals: 1,
+            speaker,
+            speech_status,
+            last_phrase: String::new(),
+        };
+        app.speak_current();
+        app
+    }
+
+    /// Speak the current card, honouring the pair toggle. Speech runs on its own
+    /// thread so synthesis never blocks the window.
+    fn speak_current(&mut self) {
+        let phrase = spoken_phrase(self.current, self.show_pair);
+        self.last_phrase = phrase.clone();
+        if let Some(speaker) = &self.speaker {
+            let speaker = speaker.clone();
+            std::thread::spawn(move || {
+                if let Err(e) = speaker.say(&phrase) {
+                    eprintln!("speech failed: {e}");
+                }
+            });
+        }
     }
 
     fn deal(&mut self) {
         let deck = full_deck();
         self.current = deck[self.random.below(deck.len())];
         self.deals = self.deals.saturating_add(1);
+        self.speak_current();
     }
 }
 
@@ -160,7 +208,17 @@ impl eframe::App for HelperApp {
                     self.deal();
                 }
                 ui.add_space(12.0);
-                ui.checkbox(&mut self.show_pair, "Show Invisible Deck pair");
+                let toggled = ui
+                    .checkbox(&mut self.show_pair, "Show Invisible Deck pair")
+                    .changed();
+                if toggled {
+                    // Speak the phrase that now applies, so the toggle is audible.
+                    self.speak_current();
+                }
+                ui.add_space(12.0);
+                if ui.button("Say again").clicked() {
+                    self.speak_current();
+                }
             });
 
             ui.add_space(10.0);
@@ -174,6 +232,17 @@ impl eframe::App for HelperApp {
                 ))
                 .small()
                 .color(egui::Color32::from_gray(140)),
+            );
+            ui.add_space(2.0);
+            ui.label(
+                egui::RichText::new(format!("Saying: \"{}\"", self.last_phrase))
+                    .small()
+                    .color(egui::Color32::from_gray(160)),
+            );
+            ui.label(
+                egui::RichText::new(&self.speech_status)
+                    .small()
+                    .color(egui::Color32::from_gray(120)),
             );
         });
     }
@@ -192,15 +261,16 @@ fn print_pairs() {
     }
 }
 
-fn print_one(seed: Option<u64>) {
+fn print_one(seed: Option<u64>, show_pair: bool) {
     let deck = full_deck();
     let mut random = match seed {
         Some(s) => Random::seeded(s),
         None => Random::live(),
     };
     let card = deck[random.below(deck.len())];
-    println!("card  : {} ({})", card.short(), card.long());
-    println!("pair  : {} ({})", card.partner().short(), card.partner().long());
+    println!("card   : {} ({})", card.short(), card.long());
+    println!("pair   : {} ({})", card.partner().short(), card.partner().long());
+    println!("phrase : \"{}\"", spoken_phrase(card, show_pair));
 }
 
 fn help() {
@@ -210,43 +280,79 @@ fn help() {
     println!("    invisible-deck-helper [OPTIONS]");
     println!();
     println!("OPTIONS:");
-    println!("    --print [--seed N]   Print one card and its invisible partner, then exit");
-    println!("    --pairs              Print all 26 pairings, then exit");
-    println!("    --version            Print version, then exit");
-    println!("    -h, --help           Print this help, then exit");
+    println!("    --print [--seed N] [--pair]   Print one card, its partner and the spoken phrase");
+    println!("    --pairs                       Print all 26 pairings");
+    println!("    --say \"<text>\"                Speak the text with Piper and exit");
+    println!("    --speech-info                 Report the TTS engine and voice in use");
+    println!("    --version                     Print version");
+    println!("    -h, --help                    Print this help");
     println!();
-    println!("With no options the window opens showing one card at a time.");
+    println!("With no options the window opens and speaks one card at a time.");
 }
 
 fn main() -> eframe::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    let has = |f: &str| args.iter().any(|a| a == f);
 
-    if args.iter().any(|a| a == "--version") {
+    if has("--version") {
         println!("{APP_NAME} {VERSION}");
         return Ok(());
     }
-    if args.iter().any(|a| a == "--help" || a == "-h") {
+    if has("--help") || has("-h") {
         help();
         return Ok(());
     }
-    if args.iter().any(|a| a == "--pairs") {
+    if has("--pairs") {
         print_pairs();
         return Ok(());
     }
-    if args.iter().any(|a| a == "--print") {
+    if has("--speech-info") {
+        match speech::Speaker::detect() {
+            Some(s) => println!("speech: available — {}", s.describe()),
+            None => println!("speech: unavailable (piper or voice model not found)"),
+        }
+        return Ok(());
+    }
+    if let Some(i) = args.iter().position(|a| a == "--say") {
+        let text = args.get(i + 1).cloned().unwrap_or_default();
+        if text.is_empty() {
+            eprintln!("error: --say needs some text");
+            std::process::exit(2);
+        }
+        let Some(speaker) = speech::Speaker::detect() else {
+            eprintln!("speech unavailable: piper or voice model not found");
+            std::process::exit(1);
+        };
+        // Synthesise and report, then try to play. Reported separately so a
+        // machine without an audio device can still prove the TTS path works.
+        let out = std::env::temp_dir().join(format!("idh-cli-{}.wav", std::process::id()));
+        if let Err(e) = speaker.synthesise(&text, &out) {
+            eprintln!("synthesis failed: {e}");
+            std::process::exit(1);
+        }
+        let size = std::fs::metadata(&out).map(|m| m.len()).unwrap_or(0);
+        println!("synthesised \"{text}\" -> {size} bytes via {}", speaker.describe());
+        match speech::play_wav(&out) {
+            Ok(()) => println!("played"),
+            Err(e) => println!("playback unavailable: {e}"),
+        }
+        let _ = std::fs::remove_file(&out);
+        return Ok(());
+    }
+    if has("--print") {
         let seed = args
             .iter()
             .position(|a| a == "--seed")
             .and_then(|i| args.get(i + 1))
             .map(|s| s.parse::<u64>().expect("--seed must be a non-negative integer"));
-        print_one(seed);
+        print_one(seed, has("--pair"));
         return Ok(());
     }
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([520.0, 700.0])
-            .with_min_inner_size([460.0, 640.0])
+            .with_inner_size([540.0, 740.0])
+            .with_min_inner_size([460.0, 660.0])
             .with_title(APP_NAME),
         ..Default::default()
     };
