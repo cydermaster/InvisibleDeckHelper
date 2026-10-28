@@ -34,7 +34,7 @@ jobs:
             org.freedesktop.Sdk.Extension.rust-stable//26.08
 
       - name: Build the bundle
-        run: ./build-flatpak.sh --bundle
+        run: bash ./build-flatpak.sh --bundle
 
       - uses: actions/upload-artifact@v4
         with:
