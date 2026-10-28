@@ -1,21 +1,33 @@
 //! Speech output: Piper TTS (piper1-gpl) plus WAV playback.
 //!
-//! Piper runs as a child process. The Flatpak bundles the `piper-tts` wheel and
-//! the `en_GB-alan-medium` voice, so the text never leaves the machine.
+//! Piper runs as a child process. The Linux build bundles the `piper-tts` wheel
+//! and the `en_GB-alan-medium` voice inside the Flatpak; the Windows build ships
+//! an embedded Python with the same wheel alongside the exe. Either way the text
+//! never leaves the machine.
 //!
-//! Playback avoids a build-time audio dependency: we `dlopen` libpulse-simple
-//! at runtime and fall back to whichever common command-line player exists.
-//! If none is available the app still works, it just doesn't speak.
+//! Playback avoids a build-time audio dependency and differs by platform:
+//! on Unix we `dlopen` libpulse-simple and fall back to common command-line
+//! players; on Windows we call `PlaySound` from winmm. If nothing is available
+//! the app still runs — it just doesn't speak.
 
+#[cfg(unix)]
 use std::ffi::CString;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 /// Where the piper entry point and voice live inside the Flatpak (or a source
-/// checkout). Overridable so the app can be run outside the sandbox.
+/// checkout, or the portable Windows folder). Overridable so the app can be run
+/// outside the sandbox.
+#[cfg(unix)]
 const APP_ID: &str = "org.cydermaster.InvisibleDeckHelper";
 const VOICE_FILE: &str = "en_GB-alan-medium.onnx";
+
+fn exe_dir() -> Option<PathBuf> {
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|d| d.to_path_buf()))
+}
 
 fn candidate_roots() -> Vec<PathBuf> {
     let mut roots = Vec::new();
@@ -23,14 +35,16 @@ fn candidate_roots() -> Vec<PathBuf> {
         roots.push(PathBuf::from(p));
     }
     // Flatpak install location.
+    #[cfg(unix)]
     roots.push(PathBuf::from(format!("/app/share/{APP_ID}")));
-    // Running from a source tree / local build.
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            roots.push(dir.to_path_buf());
-            roots.push(dir.join("../data"));
-        }
+    // Next to the executable — the portable Windows layout, and also a local build.
+    if let Some(dir) = exe_dir() {
+        roots.push(dir.clone());
+        roots.push(dir.join("data"));
+        roots.push(dir.join("voices"));
+        roots.push(dir.join("../data"));
     }
+    // Running from a source tree.
     roots.push(PathBuf::from("data"));
     roots
 }
@@ -52,24 +66,126 @@ fn piper_command() -> Option<Vec<String>> {
     if let Ok(explicit) = std::env::var("IDH_PIPER") {
         return Some(vec![explicit]);
     }
-    // Flatpak: the console script installed alongside the wheel.
-    if Path::new("/app/bin/piper").is_file() {
-        return Some(vec!["/app/bin/piper".to_string()]);
+
+    #[cfg(unix)]
+    {
+        // Flatpak: the console script installed alongside the wheel.
+        if Path::new("/app/bin/piper").is_file() {
+            return Some(vec!["/app/bin/piper".to_string()]);
+        }
+        // Flatpak: module invocation, useful if the script is missing.
+        if Path::new("/app/lib/python3/site-packages/piper").is_dir() {
+            return Some(vec!["python3".to_string(), "-m".to_string(), "piper".to_string()]);
+        }
+        // Source tree / host.
+        let local = PathBuf::from("piper-test/.venv/bin/piper");
+        if local.is_file() {
+            return Some(vec![local.to_string_lossy().to_string()]);
+        }
     }
-    // Flatpak: module invocation, useful if the script is missing.
-    if Path::new("/app/lib/python3/site-packages/piper").is_dir() {
-        return Some(vec![
-            "python3".to_string(),
-            "-m".to_string(),
-            "piper".to_string(),
-        ]);
+
+    #[cfg(windows)]
+    {
+        // Portable bundle: the embedded Python carrying the wheel.
+        if let Some(dir) = exe_dir() {
+            let py = dir.join("python").join("python.exe");
+            if py.is_file() {
+                return Some(vec![
+                    py.to_string_lossy().to_string(),
+                    "-m".to_string(),
+                    "piper".to_string(),
+                ]);
+            }
+            // A bare piper.exe dropped next to us.
+            let piper_exe = dir.join("piper.exe");
+            if piper_exe.is_file() {
+                return Some(vec![piper_exe.to_string_lossy().to_string()]);
+            }
+        }
+        // Whatever sits on PATH.
+        if let Some(found) = find_on_path(&["piper.exe", "piper"]) {
+            return Some(vec![found.to_string_lossy().to_string()]);
+        }
     }
-    // Source tree / host.
-    let local = PathBuf::from("piper-test/.venv/bin/piper");
-    if local.is_file() {
-        return Some(vec![local.to_string_lossy().to_string()]);
+
+    None
+}
+
+#[cfg(windows)]
+fn find_on_path(names: &[&str]) -> Option<PathBuf> {
+    let paths = std::env::var_os("PATH")?;
+    for dir in std::env::split_paths(&paths) {
+        for name in names {
+            let candidate = dir.join(name);
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
     }
     None
+}
+
+/// Human-readable account of everywhere `detect()` looks, for support. Written
+/// because "speech unavailable" on its own is useless to the person reading it.
+pub fn diagnose() -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "exe dir : {}\n",
+        exe_dir()
+            .map(|d| d.display().to_string())
+            .unwrap_or_else(|| "unknown".to_string())
+    ));
+    out.push_str(&format!("voice   : looking for {VOICE_FILE}\n"));
+    for root in candidate_roots() {
+        let direct = root.join(VOICE_FILE);
+        let nested = root.join("voices").join(VOICE_FILE);
+        let status = if direct.is_file() {
+            "FOUND"
+        } else if nested.is_file() {
+            "FOUND (voices/)"
+        } else {
+            "-"
+        };
+        out.push_str(&format!("  {:<60} {status}\n", root.display()));
+    }
+
+    out.push_str("piper   : invocation candidates\n");
+    if let Some(explicit) = std::env::var_os("IDH_PIPER") {
+        out.push_str(&format!("  IDH_PIPER={} (forced)\n", explicit.to_string_lossy()));
+    } else {
+        #[cfg(windows)]
+        if let Some(dir) = exe_dir() {
+            for rel in ["python\\python.exe", "piper.exe"] {
+                let candidate = dir.join(rel);
+                let status = if candidate.is_file() { "FOUND" } else { "-" };
+                out.push_str(&format!("  {:<60} {status}\n", candidate.display()));
+            }
+        }
+        #[cfg(windows)]
+        match find_on_path(&["piper.exe", "piper"]) {
+            Some(p) => out.push_str(&format!("  PATH: {p}\n", p = p.display())),
+            None => out.push_str("  PATH: no piper.exe found\n"),
+        }
+        #[cfg(unix)]
+        for candidate in [
+            "/app/bin/piper",
+            "/app/lib/python3/site-packages/piper",
+            "piper-test/.venv/bin/piper",
+        ] {
+            let status = if Path::new(candidate).exists() { "FOUND" } else { "-" };
+            out.push_str(&format!("  {candidate:<60} {status}\n"));
+        }
+    }
+
+    match Speaker::detect() {
+        Some(s) => out.push_str(&format!("\nresult  : available — {}\n", s.describe())),
+        None => out.push_str(
+            "\nresult  : UNAVAILABLE — the voice model and/or piper were not found.\n\
+             The portable Windows build needs the 'python' and 'voices' folders in the\n\
+             same directory as the exe. Run --speech-info from that directory.\n",
+        ),
+    }
+    out
 }
 
 #[derive(Clone)]
@@ -90,7 +206,10 @@ impl Speaker {
     pub fn describe(&self) -> String {
         format!(
             "{} via {}",
-            self.voice.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default(),
+            self.voice
+                .file_name()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_default(),
             self.piper.first().cloned().unwrap_or_default()
         )
     }
@@ -120,6 +239,13 @@ impl Speaker {
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
             .stderr(Stdio::piped());
+        // Keep the console window from flashing up when the GUI app shells out.
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+            cmd.creation_flags(CREATE_NO_WINDOW);
+        }
 
         let mut child = cmd.spawn().map_err(|e| format!("could not run piper: {e}"))?;
         if let Some(mut stdin) = child.stdin.take() {
@@ -144,9 +270,11 @@ impl Speaker {
 }
 
 // ---------------------------------------------------------------------------
-// Playback: dlopen libpulse-simple, else fall back to CLI players.
+// Playback: Unix dlopens libpulse-simple and falls back to CLI players;
+// Windows calls PlaySound from winmm.
 // ---------------------------------------------------------------------------
 
+#[cfg(unix)]
 mod pulse {
     use std::ffi::{c_char, c_int, c_void, CString};
 
@@ -165,17 +293,18 @@ mod pulse {
     }
 
     pub type NewFn = unsafe extern "C" fn(
-        *const c_char,      // server
-        *const c_char,      // name
-        c_int,              // dir
-        *const c_char,      // dev
-        *const c_char,      // stream_name
-        *const SampleSpec,  // ss
-        *const c_void,      // map
-        *const c_void,      // attr
-        *mut c_int,         // error
+        *const c_char,     // server
+        *const c_char,     // name
+        c_int,             // dir
+        *const c_char,     // dev
+        *const c_char,     // stream_name
+        *const SampleSpec, // ss
+        *const c_void,     // map
+        *const c_void,     // attr
+        *mut c_int,        // error
     ) -> *mut PaSimple;
-    pub type WriteFn = unsafe extern "C" fn(*mut PaSimple, *const c_void, usize, *mut c_int) -> c_int;
+    pub type WriteFn =
+        unsafe extern "C" fn(*mut PaSimple, *const c_void, usize, *mut c_int) -> c_int;
     pub type DrainFn = unsafe extern "C" fn(*mut PaSimple, *mut c_int) -> c_int;
     pub type FreeFn = unsafe extern "C" fn(*mut PaSimple);
 
@@ -238,6 +367,7 @@ mod pulse {
 }
 
 /// Minimal RIFF/WAVE (16-bit PCM) reader — enough to pull out what libpulse needs.
+#[cfg(unix)]
 fn parse_wav(bytes: &[u8]) -> Result<(u32, u8, Vec<u8>), String> {
     if bytes.len() < 12 || &bytes[0..4] != b"RIFF" || &bytes[8..12] != b"WAVE" {
         return Err("not a RIFF/WAVE file".to_string());
@@ -259,7 +389,8 @@ fn parse_wav(bytes: &[u8]) -> Result<(u32, u8, Vec<u8>), String> {
         match id {
             b"fmt " => {
                 if body_end - body_start >= 16 {
-                    channels = u16::from_le_bytes([bytes[body_start + 2], bytes[body_start + 3]]) as u8;
+                    channels =
+                        u16::from_le_bytes([bytes[body_start + 2], bytes[body_start + 3]]) as u8;
                     rate = u32::from_le_bytes([
                         bytes[body_start + 4],
                         bytes[body_start + 5],
@@ -282,6 +413,7 @@ fn parse_wav(bytes: &[u8]) -> Result<(u32, u8, Vec<u8>), String> {
     Err("no data chunk".to_string())
 }
 
+#[cfg(unix)]
 fn play_with_pulse(path: &Path) -> Result<(), String> {
     let lib = pulse::Lib::open().ok_or("libpulse-simple not available")?;
     let bytes = std::fs::read(path).map_err(|e| format!("read wav: {e}"))?;
@@ -322,6 +454,7 @@ fn play_with_pulse(path: &Path) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(unix)]
 fn play_with_cli(path: &Path) -> Result<(), String> {
     // Order matters: PulseAudio/PipeWire first, then ALSA, then sox/ffmpeg.
     for (prog, args) in [
@@ -341,9 +474,54 @@ fn play_with_cli(path: &Path) -> Result<(), String> {
     Err("no audio player available (looked for paplay, pw-play, aplay, ffplay, play)".to_string())
 }
 
+// Windows: winmm's PlaySound plays a WAV file directly — no crates, no COM.
+#[cfg(windows)]
+#[link(name = "winmm")]
+extern "system" {
+    fn PlaySoundW(psz_sound: *const u16, hmod: *mut std::ffi::c_void, fdw_sound: u32) -> i32;
+}
+
+#[cfg(windows)]
+fn play_with_winmm(path: &Path) -> Result<(), String> {
+    use std::os::windows::ffi::OsStrExt;
+
+    const SND_FILENAME: u32 = 0x0002_0000;
+    const SND_NODEFAULT: u32 = 0x0000_0002;
+    const SND_SYNC: u32 = 0x0000_0000;
+
+    let wide: Vec<u16> = path
+        .as_os_str()
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    let ok = unsafe {
+        PlaySoundW(
+            wide.as_ptr(),
+            std::ptr::null_mut(),
+            SND_FILENAME | SND_NODEFAULT | SND_SYNC,
+        )
+    };
+    if ok == 0 {
+        Err(format!("PlaySound failed for {}", path.display()))
+    } else {
+        Ok(())
+    }
+}
+
+#[cfg(unix)]
 pub fn play_wav(path: &Path) -> Result<(), String> {
     match play_with_pulse(path) {
         Ok(()) => Ok(()),
         Err(pulse_err) => play_with_cli(path).map_err(|cli_err| format!("{pulse_err}; {cli_err}")),
     }
+}
+
+#[cfg(windows)]
+pub fn play_wav(path: &Path) -> Result<(), String> {
+    play_with_winmm(path)
+}
+
+#[cfg(not(any(unix, windows)))]
+pub fn play_wav(_path: &Path) -> Result<(), String> {
+    Err("audio playback is not implemented for this platform".to_string())
 }

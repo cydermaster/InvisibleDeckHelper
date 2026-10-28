@@ -105,6 +105,56 @@ itself is small — it contains the app, the voice and the wheels, not the runti
 Because the manifest fetches every wheel and the voice by **URL + sha256**, a
 first build needs network access; the build itself then runs offline.
 
+## Windows 11
+
+The same source builds for Windows. The window, the pairing engine and the
+spoken phrases are shared; only three pieces differ — the OS random source
+(`RtlGenRandom` instead of `/dev/urandom`), audio playback (`PlaySound` from
+winmm instead of PulseAudio), and how Piper is found (an embedded
+`python\python.exe` beside the exe instead of `/app/bin/piper`).
+
+It ships as a portable folder — no installer, nothing installed on the machine:
+
+```
+InvisibleDeckHelper-<version>-windows-x86_64\
+    invisible-deck-helper.exe
+    python\          embedded CPython 3.11 carrying piper-tts and its dependencies
+    voices\          en_GB-alan-medium.onnx
+    README.txt
+```
+
+**Keep the folders beside the exe.** The exe on its own runs and deals cards, but
+it cannot speak: everything it needs for speech lives in `python\` and `voices\`.
+
+Build it either way:
+
+```powershell
+# on Windows, with MSVC
+.\windows\build-portable-zip.ps1
+```
+
+```bash
+# on Linux, cross-compiling with mingw-w64 (needs gcc-mingw-w64-x86-64)
+./windows/build-portable-zip.sh
+```
+
+The voice model is fetched from Hugging Face and checked against a pinned
+SHA-256 rather than committed — 63 MB of binary does not belong in git. Both
+scripts accept `NUMPY_PIN='numpy==1.26.4'` as an escape hatch if a future numpy
+release fails to load on a target machine.
+
+The exe is **not code-signed**, so the first run shows Windows SmartScreen's
+"Windows protected your PC" box: *More info* → *Run anyway*. Signing is the only
+way to remove that, and it needs a certificate.
+
+If speech is ever unavailable, `invisible-deck-helper.exe --speech-info` lists
+every path it searched and marks which it found.
+
+CI tests and builds on Ubuntu and Windows for every push
+(`.github/workflows/ci.yml`), and tagging `v<version>` publishes both the
+Flatpak and the Windows ZIP to the GitHub release
+(`.github/workflows/release.yml`).
+
 ## Layout
 
 ```
@@ -118,4 +168,9 @@ data/icons/*.svg                    application icon
 org.cydermaster.InvisibleDeckHelper.yml   Flatpak manifest
 build-flatpak.sh                    one-command build + bundle
 cargo-sources.json                  vendored crate sources (generated)
+windows/build-portable-zip.sh       Windows portable ZIP, cross-built from Linux
+windows/build-portable-zip.ps1      Windows portable ZIP, built natively on Windows
+windows/README-portable.txt         the README shipped inside the ZIP
+.github/workflows/ci.yml            test + build on Ubuntu and Windows
+.github/workflows/release.yml       tag -> Flatpak + Windows ZIP on a release
 ```

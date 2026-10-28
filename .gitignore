@@ -1,0 +1,16 @@
+# Rust
+/target
+
+# Build and packaging output
+/dist
+/.win-build
+/build-dir
+/repo
+/.flatpak-builder
+/.venv-gen
+/bin
+*.flatpak
+
+# Editors / OS
+.DS_Store
+*.swp

@@ -339,7 +339,7 @@ fn main() -> eframe::Result<()> {
     if has("--speech-info") {
         match speech::Speaker::detect() {
             Some(s) => println!("speech: available — {}", s.describe()),
-            None => println!("speech: unavailable (piper or voice model not found)"),
+            None => print!("{}", speech::diagnose()),
         }
         return Ok(());
     }

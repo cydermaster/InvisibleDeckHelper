@@ -1,12 +1,34 @@
 //! A small deterministic-friendly random source.
 //!
-//! Live picks read from the OS CSPRNG (`/dev/urandom`), which keeps dependencies
-//! to zero. When a seed is supplied, the same hand-rolled SplitMix64 used by the
-//! companion Rust/Go/Zig card-dealer ports is used instead, with rejection
-//! sampling so every card is equally likely.
+//! Live picks read from the OS CSPRNG — `/dev/urandom` on Unix, `RtlGenRandom`
+//! on Windows — which keeps dependencies to zero. When a seed is supplied, the
+//! same hand-rolled SplitMix64 used by the companion Rust/Go/Zig card-dealer
+//! ports is used instead, with rejection sampling so every card is equally
+//! likely.
 
+#[cfg(unix)]
 use std::fs::File;
+#[cfg(unix)]
 use std::io::Read;
+
+/// Fill `buf` from the operating system's cryptographically secure source.
+#[cfg(unix)]
+fn os_random(buf: &mut [u8]) {
+    let mut f = File::open("/dev/urandom").expect("/dev/urandom unavailable");
+    f.read_exact(buf).expect("failed reading /dev/urandom");
+}
+
+/// Windows: `SystemFunction036` (the documented name for RtlGenRandom) in
+/// advapi32. It is the OS CSPRNG, so this stays dependency-free.
+#[cfg(windows)]
+fn os_random(buf: &mut [u8]) {
+    #[link(name = "advapi32")]
+    extern "system" {
+        fn SystemFunction036(buffer: *mut u8, length: u32) -> u8;
+    }
+    let ok = unsafe { SystemFunction036(buf.as_mut_ptr(), buf.len() as u32) };
+    assert_eq!(ok, 1, "RtlGenRandom (SystemFunction036) failed");
+}
 
 pub struct Random {
     state: Option<u64>,
@@ -34,8 +56,7 @@ impl Random {
             }
             None => {
                 let mut buf = [0u8; 8];
-                let mut f = File::open("/dev/urandom").expect("/dev/urandom unavailable");
-                f.read_exact(&mut buf).expect("failed reading /dev/urandom");
+                os_random(&mut buf);
                 u64::from_ne_bytes(buf)
             }
         }
