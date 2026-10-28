@@ -48,6 +48,13 @@
   <url type="bugtracker">https://github.com/cydermaster/InvisibleDeckHelper/issues</url>
 
   <releases>
+    <release version="1.1.1" date="2026-10-28">
+      <description>
+        <p>Adds a "Mute speech" tickbox to silence the voice for a session without
+        losing the spoken phrase on screen, plus an IDH_MUTE=1 environment
+        override for starting silent.</p>
+      </description>
+    </release>
     <release version="1.1.0" date="2026-10-28">
       <description>
         <p>Adds spoken output using Piper with the English (Great Britain) Alan

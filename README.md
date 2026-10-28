@@ -23,6 +23,11 @@ Playback uses `libpulse-simple` from the runtime (dlopen'd, so nothing is linked
 at build time), falling back to `paplay` / `pw-play` / `aplay` / `ffplay` / `play`
 if that is unavailable.
 
+**Silencing it.** Tick **Mute speech** in the window for a silent session — the
+screen still shows `Muted — would say: "…"` so nothing is lost, and unticking it
+restores the voice. To start silent, set `IDH_MUTE=1` (handy for scripting or for
+practising somewhere you cannot make noise).
+
 ## The pairing scheme
 
 Taken from the published Royal Magic / FUN Inc. Invisible Deck pairing guide:
@@ -47,6 +52,7 @@ Run `invisible-deck-helper --pairs` to print all 26 pairings.
 | Deal the next card | **Deal new card** button, or **Space** / **Enter** |
 | Reveal + announce the pair | Tick **Show Invisible Deck pair** (starts off) |
 | Repeat the speech | **Say again** |
+| Silence the voice | Tick **Mute speech** (starts off) |
 
 Command line, for checking things without a window:
 
