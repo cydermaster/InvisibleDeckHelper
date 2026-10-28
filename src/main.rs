@@ -2,7 +2,8 @@
 //!
 //! Deals one card at a time and speaks it aloud with Piper (en_GB-alan-medium).
 //! By default it says just the card ("Queen of Hearts"); with the pair toggle on
-//! it says "Queen of Hearts pairs with Ace of Spades".
+//! it says "Queen of Hearts pairs with Ace of Spades". A "Mute speech" tickbox
+//! silences the voice without changing what would have been said.
 
 mod cards;
 mod rng;
@@ -75,6 +76,19 @@ struct HelperApp {
     speaker: Option<speech::Speaker>,
     speech_status: String,
     last_phrase: String,
+    /// Silence the voice for this session. Off by default: the point of the app
+    /// is to hear the card, but a quiet rehearsal should not need the volume
+    /// control.
+    muted: bool,
+}
+
+/// Speech can be muted from the tickbox, or silenced from startup with
+/// `IDH_MUTE=1` (useful for scripted checks and for silent practice).
+fn muted_at_start() -> bool {
+    matches!(
+        std::env::var("IDH_MUTE").as_deref(),
+        Ok("1") | Ok("true") | Ok("yes")
+    )
 }
 
 impl HelperApp {
@@ -100,6 +114,7 @@ impl HelperApp {
             speaker,
             speech_status,
             last_phrase: String::new(),
+            muted: muted_at_start(),
         };
         app.speak_current();
         app
@@ -110,6 +125,11 @@ impl HelperApp {
     fn speak_current(&mut self) {
         let phrase = spoken_phrase(self.current, self.show_pair);
         self.last_phrase = phrase.clone();
+        if self.muted {
+            // Stay silent, but keep last_phrase current so unticking Mute and
+            // pressing "Say again" speaks the right thing.
+            return;
+        }
         if let Some(speaker) = &self.speaker {
             let speaker = speaker.clone();
             std::thread::spawn(move || {
@@ -219,6 +239,10 @@ impl eframe::App for HelperApp {
                 if ui.button("Say again").clicked() {
                     self.speak_current();
                 }
+                ui.add_space(12.0);
+                // Checking this silences the voice; the phrases above stay honest
+                // about what would have been said.
+                ui.checkbox(&mut self.muted, "Mute speech");
             });
 
             ui.add_space(10.0);
@@ -235,9 +259,13 @@ impl eframe::App for HelperApp {
             );
             ui.add_space(2.0);
             ui.label(
-                egui::RichText::new(format!("Saying: \"{}\"", self.last_phrase))
-                    .small()
-                    .color(egui::Color32::from_gray(160)),
+                egui::RichText::new(if self.muted {
+                    format!("Muted — would say: \"{}\"", self.last_phrase)
+                } else {
+                    format!("Saying: \"{}\"", self.last_phrase)
+                })
+                .small()
+                .color(egui::Color32::from_gray(160)),
             );
             ui.label(
                 egui::RichText::new(&self.speech_status)
@@ -288,6 +316,8 @@ fn help() {
     println!("    -h, --help                    Print this help");
     println!();
     println!("With no options the window opens and speaks one card at a time.");
+    println!("Tick the \"Mute speech\" box in the window for a silent session, or start");
+    println!("silent with IDH_MUTE=1.");
 }
 
 fn main() -> eframe::Result<()> {
