@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Cydermaster
+
 //! Invisible Deck Helper — a practice aid for the Invisible Deck card trick.
 //!
 //! Deals one card at a time and speaks it aloud with Piper (en_GB-alan-medium).

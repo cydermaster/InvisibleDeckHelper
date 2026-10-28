@@ -5,6 +5,11 @@
 ; compiled against a bundle produced by build-portable-zip.ps1 / .sh — never
 ; against a bare exe.
 ;
+; Licence: Invisible Deck Helper is GPL-3.0-or-later. LicenseFile below makes
+; the wizard show the full text and require acceptance, and the bundle carries
+; LICENSE and NOTICE (third-party components: Piper, CPython, onnxruntime,
+; numpy, the voice model).
+;
 ; Compile:
 ;   ISCC.exe /DMyAppVersion=1.3.0 /DBundleDir=<bundle folder> installer.iss
 ;
@@ -44,6 +49,9 @@ VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription={#MyAppName} Setup
 VersionInfoProductName={#MyAppName}
 VersionInfoProductVersion={#MyAppVersion}
+; Shown as LegalCopyright on the setup.exe itself and read by some scanners.
+AppCopyright=GPL-3.0-or-later
+VersionInfoCopyright=GPL-3.0-or-later (C) 2026 {#MyAppPublisher}
 
 ; Per-user by default so there is no UAC prompt; the installer offers an
 ; all-users install if run with /ALLUSERS.

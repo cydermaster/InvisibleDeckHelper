@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Cydermaster
+
 //! Speech output: Piper TTS (piper1-gpl) plus WAV playback.
 //!
 //! Piper runs as a child process. The Linux build bundles the `piper-tts` wheel

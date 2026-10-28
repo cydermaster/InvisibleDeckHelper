@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Cydermaster
+
 //! The Invisible Deck pairing scheme.
 //!
 //! Every card is glued back-to-back with exactly one other card, so the deck is

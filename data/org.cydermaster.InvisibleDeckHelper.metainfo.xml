@@ -2,7 +2,7 @@
 <component type="desktop-application">
   <id>org.cydermaster.InvisibleDeckHelper</id>
   <metadata_license>CC0-1.0</metadata_license>
-  <project_license>MIT</project_license>
+  <project_license>GPL-3.0-or-later</project_license>
   <name>Invisible Deck Helper</name>
   <summary>Practice aid for the Invisible Deck card trick</summary>
 

@@ -195,3 +195,20 @@ windows/README-portable.txt         the README shipped inside the ZIP
 .github/workflows/ci.yml            test + build on Ubuntu and Windows
 .github/workflows/release.yml       tag -> Flatpak + Windows ZIP on a release
 ```
+
+## Licence
+
+Invisible Deck Helper is free software: you can redistribute it and/or modify it
+under the terms of the **GNU General Public License, version 3 or (at your
+option) any later version**. See [LICENSE](LICENSE) for the full text.
+
+Both packages bundle third-party software with its own licences — Piper TTS
+(GPL-3.0-or-later), the espeak-ng data (GPL-3.0-or-later), CPython (PSF-2.0),
+onnxruntime (MIT), numpy (BSD-3-Clause) and the `en_GB-alan-medium` voice
+(CC BY 4.0). [NOTICE](NOTICE) lists each component and its licence; the
+installer shows LICENSE during setup and both files ship inside the ZIP and the
+installed program folder.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.

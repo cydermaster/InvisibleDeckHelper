@@ -1,10 +1,11 @@
 Invisible Deck Helper — third-party components
 ==============================================
 
-This package bundles software written by others. Their licences are below. The
-project's own licence is whatever the LICENSE file in this folder says; where
-Cargo.toml and LICENSE disagree, the LICENSE file governs and the discrepancy
-should be resolved rather than guessed at.
+This package bundles software written by others. Their licences are below.
+Invisible Deck Helper itself is licensed under the GNU General Public License,
+version 3 or (at your option) any later version — see the LICENSE file in this
+folder for the full text. Unless stated otherwise, the licences of the bundled
+components below apply only to those components.
 
 Included components
 
