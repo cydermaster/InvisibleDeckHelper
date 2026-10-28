@@ -97,10 +97,15 @@ python -m pip download --quiet --only-binary=:all: @targetArgs $PiperSpec @pin -
 if ($LASTEXITCODE -ne 0) { throw 'pip download failed' }
 
 Write-Host '>> installing into the embedded interpreter'
-python -m pip install --quiet --no-index --find-links=$wheels --target=$sitePackages @targetArgs $PiperSpec @pin
+python -m pip install --quiet --no-index --find-links=$wheels --target=$sitePackages @targetArgs $PiperSpec @pin --no-compile
 if ($LASTEXITCODE -ne 0) { throw 'pip install failed' }
 
-Remove-Item -Recurse -Force (Join-Path $sitePackages '__pycache__'), (Join-Path $sitePackages 'bin') -ErrorAction SilentlyContinue
+# --no-compile stops pip writing .pyc for *its own* interpreter (the runner's,
+# not the embedded 3.11). Those files are useless here and only bloat the
+# bundle, so purge any that slipped in from an earlier run.
+Get-ChildItem -Path $sitePackages -Recurse -Directory -Filter '__pycache__' -ErrorAction SilentlyContinue |
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force (Join-Path $sitePackages 'bin') -ErrorAction SilentlyContinue
 
 # The embedded distribution ignores site-packages until its ._pth lists it.
 $pth = Join-Path $pyembed "python$PythonTag._pth"
@@ -129,6 +134,12 @@ if ($jsonHash -ne $VoiceJsonSha256) {
 
 $readme = (Get-Content (Join-Path $root 'windows\README-portable.txt') -Raw) -replace '__VERSION__', $version
 Set-Content -Path (Join-Path $out 'README.txt') -Value $readme -Encoding utf8
+
+# Licence texts travel with the binaries that need them.
+foreach ($doc in @('LICENSE', 'NOTICE')) {
+    $src = Join-Path $root $doc
+    if (Test-Path $src) { Copy-Item $src $out -Force }
+}
 
 # ---- 5. zip -----------------------------------------------------------------
 Write-Host '>> zipping'

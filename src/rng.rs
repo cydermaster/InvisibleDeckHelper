@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Cydermaster
+
 //! A small deterministic-friendly random source.
 //!
 //! Live picks read from the OS CSPRNG — `/dev/urandom` on Unix, `RtlGenRandom`

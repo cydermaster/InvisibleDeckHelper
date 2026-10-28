@@ -138,6 +138,27 @@ Build it either way:
 ./windows/build-portable-zip.sh
 ```
 
+### Installer
+
+For people who would rather have it in the Start Menu, `windows/installer.iss`
+builds an Inno Setup installer from the same bundle — identical files, packaged
+with an uninstaller:
+
+```powershell
+winget install --id JRSoftware.InnoSetup --exact   # once
+.\windows\build-portable-zip.ps1                    # produces the bundle
+.\windows\build-installer.ps1                       # wraps the bundle in a setup.exe
+```
+
+It installs **per-user** by default (`%LOCALAPPDATA%\Programs\Invisible Deck Helper`)
+so there is no UAC prompt, and offers an all-users install if launched with
+`/ALLUSERS`. It adds a Start Menu entry, an optional desktop shortcut, and
+registers in Add or Remove Programs. Because the payload is ~240 MB compressed
+with LZMA2, the setup file ends up roughly the size of the ZIP.
+
+The installer is unsigned for now, so SmartScreen will warn on first run — see
+the note below.
+
 The voice model is fetched from Hugging Face and checked against a pinned
 SHA-256 rather than committed — 63 MB of binary does not belong in git. Both
 scripts accept `NUMPY_PIN='numpy==1.26.4'` as an escape hatch if a future numpy
@@ -174,3 +195,20 @@ windows/README-portable.txt         the README shipped inside the ZIP
 .github/workflows/ci.yml            test + build on Ubuntu and Windows
 .github/workflows/release.yml       tag -> Flatpak + Windows ZIP on a release
 ```
+
+## Licence
+
+Invisible Deck Helper is free software: you can redistribute it and/or modify it
+under the terms of the **GNU General Public License, version 3 or (at your
+option) any later version**. See [LICENSE](LICENSE) for the full text.
+
+Both packages bundle third-party software with its own licences — Piper TTS
+(GPL-3.0-or-later), the espeak-ng data (GPL-3.0-or-later), CPython (PSF-2.0),
+onnxruntime (MIT), numpy (BSD-3-Clause) and the `en_GB-alan-medium` voice
+(CC BY 4.0). [NOTICE](NOTICE) lists each component and its licence; the
+installer shows LICENSE during setup and both files ship inside the ZIP and the
+installed program folder.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.

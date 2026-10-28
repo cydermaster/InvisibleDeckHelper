@@ -2,7 +2,7 @@
 <component type="desktop-application">
   <id>org.cydermaster.InvisibleDeckHelper</id>
   <metadata_license>CC0-1.0</metadata_license>
-  <project_license>MIT</project_license>
+  <project_license>GPL-3.0-or-later</project_license>
   <name>Invisible Deck Helper</name>
   <summary>Practice aid for the Invisible Deck card trick</summary>
 
@@ -48,6 +48,14 @@
   <url type="bugtracker">https://github.com/cydermaster/InvisibleDeckHelper/issues</url>
 
   <releases>
+    <release version="1.3.0" date="2026-10-28">
+      <description>
+        <p>Adds an Inno Setup installer for Windows alongside the portable ZIP:
+        per-user by default so there is no UAC prompt, with Start Menu entries,
+        an optional desktop shortcut and a proper uninstaller in Add or Remove
+        Programs. Both packages contain the same files.</p>
+      </description>
+    </release>
     <release version="1.2.0" date="2026-10-28">
       <description>
         <p>Runs on Windows 11 as well as Linux. Speech keeps using Piper with the

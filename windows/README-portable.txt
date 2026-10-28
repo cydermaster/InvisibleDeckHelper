@@ -61,4 +61,6 @@ Speech synthesis takes a second or two per phrase, because the voice model
 is loaded fresh each time.
 
 Version __VERSION__ - https://github.com/cydermaster/InvisibleDeckHelper
-MIT licensed.
+Invisible Deck Helper is free software under the GNU General Public License,
+version 3 or (at your option) any later version. See LICENSE for the full text
+and NOTICE for the licences of the bundled components.
