@@ -2,7 +2,9 @@ app-id: org.cydermaster.InvisibleDeckHelper
 runtime: org.freedesktop.Platform
 runtime-version: '26.08'
 sdk: org.freedesktop.Sdk
-# Rust toolchain ships as an SDK extension, so no compiler has to be vendored.
+# Branch matches the runtime, so the plain name resolves correctly.
+# (A GNOME runtime would have pulled the extension at branch 51, which does not
+# exist — and org.freedesktop.Platform already ships python3.14 + libpulse.)
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable
 command: invisible-deck-helper
@@ -13,15 +15,77 @@ finish-args:
   - --socket=wayland
   - --socket=fallback-x11
   - --device=dri
-
-build-options:
-  append-path: /usr/lib/sdk/rust-stable/bin
-  env:
-    CARGO_HOME: /run/build/invisible-deck-helper/cargo
+  # Speech playback: the runtime ships libpulse-simple, which the app dlopen()s;
+  # this socket lets it reach the host mixer (PipeWire).
+  - --socket=pulseaudio
+  # Python packages live under /app, which the runtime's python does not search.
+  - --env=PYTHONPATH=/app/lib/python3.14/site-packages
+  - --env=IDH_DATA_DIR=/app/share/org.cydermaster.InvisibleDeckHelper
 
 modules:
+  # --- Piper TTS (piper1-gpl) --------------------------------------------------
+  # piper-tts is a cp39-abi3 wheel with a compiled espeak-ng bridge; every
+  # dependency is pinned to a cp314 wheel because the runtime's python is 3.14.
+  - name: piper-tts
+    buildsystem: simple
+    build-commands:
+      - python3 -m pip install --no-index --no-build-isolation
+        --break-system-packages --find-links=. --prefix=/app piper-tts==1.8.0
+      # pip writes a shebang for the build-time interpreter; normalise it.
+      - if [ -f /app/bin/piper ]; then sed -i '1s|.*|#!/usr/bin/env python3|' /app/bin/piper; fi
+      - test -x /app/bin/piper
+    sources:
+      - type: file
+        url: https://github.com/OHF-Voice/piper1-gpl/releases/download/v1.8.0/piper_tts-1.8.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.manylinux_2_28_x86_64.whl
+        sha256: 25b4d3f31ff70c8fa7151908e00aaa5650cbdf16bca8fcf21299f3941b89a7d3
+      - type: file
+        url: https://files.pythonhosted.org/packages/aa/74/a891a659ccc427469de0d7bdbd5ff770a35f73084ee590ce02456cf61f7f/onnxruntime-1.31.1-cp314-cp314-manylinux_2_28_x86_64.whl
+        sha256: c20d7f15d84427db070b163f78c2c7146cc93edd6113fa7327671259a24184fe
+        dest-filename: onnxruntime-1.31.1-cp314-cp314-manylinux_2_28_x86_64.whl
+      - type: file
+        url: https://files.pythonhosted.org/packages/16/d5/928078d2b28f26829b138b4a6c3980045022fb409f570657a224ae60ef4e/numpy-2.5.4-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+        sha256: d549420b8858885cea8838a727842249218b9c1da24dd517e25c9c7a948310a3
+        dest-filename: numpy-2.5.4-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+      - type: file
+        url: https://files.pythonhosted.org/packages/e4/04/d52c7016b04b6c5108f26691f9d33ec82a9b65d041f1a9c771137693d618/protobuf-7.36.2-py3-none-any.whl
+        sha256: bdb3a345d48db958e6ce1f18e508beb0cc981d64f24088427549c866cd039f1e
+        dest-filename: protobuf-7.36.2-py3-none-any.whl
+      - type: file
+        url: https://files.pythonhosted.org/packages/e8/2d/d2a548598be01649e2d46231d151a6c56d10b964d94043a335ae56ea2d92/flatbuffers-25.12.19-py2.py3-none-any.whl
+        sha256: 7634f50c427838bb021c2d66a3d1168e9d199b0607e6329399f04846d42e20b4
+        dest-filename: flatbuffers-25.12.19-py2.py3-none-any.whl
+      - type: file
+        url: https://files.pythonhosted.org/packages/9a/70/875f4a23bfc4731703a5835487d0d2fb999031bd415e7d17c0ae615c18b7/pathvalidate-3.3.1-py3-none-any.whl
+        sha256: 5263baab691f8e1af96092fa5137ee17df5bdfbd6cff1fcac4d6ef4bc2e1735f
+        dest-filename: pathvalidate-3.3.1-py3-none-any.whl
+      - type: file
+        url: https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl
+        sha256: d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c
+        dest-filename: packaging-26.3-py3-none-any.whl
+
+  # --- Voice model: English (Great Britain), Alan, medium quality --------------
+  - name: invisible-deck-voice
+    buildsystem: simple
+    build-commands:
+      - install -Dm644 en_GB-alan-medium.onnx
+        /app/share/org.cydermaster.InvisibleDeckHelper/en_GB-alan-medium.onnx
+      - install -Dm644 en_GB-alan-medium.onnx.json
+        /app/share/org.cydermaster.InvisibleDeckHelper/en_GB-alan-medium.onnx.json
+    sources:
+      - type: file
+        url: https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/alan/medium/en_GB-alan-medium.onnx
+        sha256: 0a309668932205e762801f1efc2736cd4b0120329622adf62be09e56339d3330
+      - type: file
+        url: https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/alan/medium/en_GB-alan-medium.onnx.json
+        sha256: c0f0d124e5895c00e7c03b35dcc8287f319a6998a365b182deb5c8e752ee8c1e
+
+  # --- The app -----------------------------------------------------------------
   - name: invisible-deck-helper
     buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/rust-stable/bin
+      env:
+        CARGO_HOME: /run/build/invisible-deck-helper/cargo
     build-commands:
       # --offline: every crate comes from cargo-sources.json, nothing is fetched.
       - cargo --offline fetch --manifest-path Cargo.toml --verbose
@@ -45,7 +109,6 @@ modules:
           - .flatpak-cargo-generator.py
           - repo
           - '*.flatpak'
-          - screenshot.png
-          - 'screenshot-*.png'
+          - 'screenshot*.png'
           - vendor
       - cargo-sources.json
